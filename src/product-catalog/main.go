@@ -21,27 +21,33 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	otelhooks "github.com/open-feature/go-sdk-contrib/hooks/open-telemetry/pkg"
+	flagd "github.com/open-feature/go-sdk-contrib/providers/flagd/pkg"
+	"github.com/open-feature/go-sdk/openfeature"
+	pb "github.com/opentelemetry/opentelemetry-demo/src/product-catalog/genproto/oteldemo"
+	"go.opentelemetry.io/contrib/bridges/otellogrus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelcodes "go.opentelemetry.io/otel/codes"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+
+	//"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdkresource "go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
-
-	otelhooks "github.com/open-feature/go-sdk-contrib/hooks/open-telemetry/pkg"
-	flagd "github.com/open-feature/go-sdk-contrib/providers/flagd/pkg"
-	"github.com/open-feature/go-sdk/openfeature"
-	pb "github.com/opentelemetry/opentelemetry-demo/src/product-catalog/genproto/oteldemo"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
@@ -58,8 +64,7 @@ var (
 const DEFAULT_RELOAD_INTERVAL = 10
 
 func init() {
-	log = logrus.New()
-
+	initLogProvider()
 	loadProductCatalog()
 }
 
@@ -112,13 +117,39 @@ func initMeterProvider() *sdkmetric.MeterProvider {
 	return mp
 }
 
+func initLogProvider() {
+	ctx := context.Background()
+	logExporter, err := otlploggrpc.New(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	lp := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
+		sdklog.WithResource(initResource()),
+	)
+
+	global.SetLoggerProvider(lp)
+
+	log = logrus.New()
+
+	baseHook := otellogrus.NewHook("product-catalog", otellogrus.WithLoggerProvider(lp))
+
+	customHook := &severityHook{
+		baseHook: baseHook,
+	}
+
+	log.AddHook(customHook)
+}
+
 func main() {
+
 	tp := initTracerProvider()
 	defer func() {
 		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Fatalf("Tracer Provider Shutdown: %v", err)
+			logrus.Fatalf("Tracer Provider Shutdown: %v", err)
 		}
-		log.Println("Shutdown tracer provider")
+		log.Info("Shutdown tracer provider")
 	}()
 
 	mp := initMeterProvider()
@@ -157,9 +188,9 @@ func main() {
 	reflection.Register(srv)
 
 	pb.RegisterProductCatalogServiceServer(srv, svc)
-
-	healthcheck := health.NewServer()
-	healthpb.RegisterHealthServer(srv, healthcheck)
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	//healthpb.RegisterHealthServer(srv, healthServer)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
 	defer cancel()
@@ -181,7 +212,9 @@ type productCatalog struct {
 }
 
 func loadProductCatalog() {
+
 	log.Info("Loading Product Catalog...")
+
 	var err error
 	catalog, err = readProductFiles()
 	if err != nil {
@@ -198,8 +231,8 @@ func loadProductCatalog() {
 			interval = DEFAULT_RELOAD_INTERVAL
 		}
 	}
-	log.Infof("Product Catalog reload interval: %d", interval)
 
+	log.Infof("Product Catalog reload interval: %d", interval)
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 
 	go func() {
@@ -294,6 +327,8 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		msg := fmt.Sprintf("Error: Product Catalog Fail Feature Flag Enabled")
 		span.SetStatus(otelcodes.Error, msg)
 		span.AddEvent(msg)
+
+		log.WithContext(ctx).Error(msg)
 		return nil, status.Errorf(codes.Internal, msg)
 	}
 
@@ -309,6 +344,7 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		msg := fmt.Sprintf("Product Not Found: %s", req.Id)
 		span.SetStatus(otelcodes.Error, msg)
 		span.AddEvent(msg)
+		log.WithContext(ctx).Error(msg)
 		return nil, status.Errorf(codes.NotFound, msg)
 	}
 
@@ -353,4 +389,48 @@ func createClient(ctx context.Context, svcAddr string) (*grpc.ClientConn, error)
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
+}
+
+// 自定义钩子结构体
+type severityHook struct {
+	baseHook *otellogrus.Hook
+}
+
+// 实现 Levels 方法
+func (h *severityHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+// 实现 Fire 方法
+func (h *severityHook) Fire(entry *logrus.Entry) error {
+	// 添加 severity_text 字段
+	if entry.Data == nil {
+		entry.Data = make(logrus.Fields)
+	}
+	entry.Data["severity_text"] = getSeverityText(entry.Level)
+
+	// 调用基础钩子的 Fire 方法
+	return h.baseHook.Fire(entry)
+}
+
+// 将 logrus 级别转换为文本表示
+func getSeverityText(level logrus.Level) string {
+	switch level {
+	case logrus.TraceLevel:
+		return "TRACE"
+	case logrus.DebugLevel:
+		return "DEBUG"
+	case logrus.InfoLevel:
+		return "INFO"
+	case logrus.WarnLevel:
+		return "WARN"
+	case logrus.ErrorLevel:
+		return "ERROR"
+	case logrus.FatalLevel:
+		return "FATAL"
+	case logrus.PanicLevel:
+		return "FATAL"
+	default:
+		return "UNSPECIFIED"
+	}
 }

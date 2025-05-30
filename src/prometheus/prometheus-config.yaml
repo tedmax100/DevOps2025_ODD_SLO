@@ -19,3 +19,18 @@ otlp:
 storage:
   tsdb:
     out_of_order_time_window: 30m
+
+scrape_configs:
+  - job_name: 'cadvisor'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metric_relabel_configs:
+      # 保留業務服務的容器指標
+      - source_labels: [container_label_com_docker_compose_service]
+        regex: '(accounting|ad|cart|checkout|currency|email|fraud-detection|frontend|frontend-proxy|image-provider|load-generator|payment|product-catalog|quote|recommendation|shipping|flagd|flagd-ui)'
+        action: keep
+      # 排除基礎設施服務
+      - source_labels: [container_label_com_docker_compose_service]
+        regex: '(kafka|grafana|loki|prometheus|jaeger|otel-collector|valkey-cart)'
+        action: drop

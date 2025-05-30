@@ -758,8 +758,8 @@ services:
     depends_on:
       jaeger:
         condition: service_started
-      opensearch:
-        condition: service_healthy
+      loki:
+        condition: service_started
     logging: *logging
     environment:
       - ENVOY_PORT
@@ -783,6 +783,9 @@ services:
       - --web.route-prefix=/
       - --web.enable-otlp-receiver
       - --enable-feature=exemplar-storage
+      - --enable-feature=otlp-write-receiver
+      - --web.enable-remote-write-receiver
+      - --enable-feature=remote-write-receiver
     volumes:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
     deploy:
@@ -794,38 +797,37 @@ services:
       - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
     logging: *logging
 
-  # OpenSearch
-  opensearch:
-    image: ${OPENSEARCH_IMAGE}
-    container_name: opensearch
+  # Loki
+  loki:
+    image: grafana/loki:3.5.0
+    container_name: loki
+    command:
+      - -config.expand-env=true
+      - -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./src/loki/loki.yaml:/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+
+
+  # cAdvisor for container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
     deploy:
       resources:
         limits:
-          memory: 1.1G
-    restart: unless-stopped
-    environment:
-      - cluster.name=demo-cluster
-      - node.name=demo-node
-      - bootstrap.memory_lock=true
-      - discovery.type=single-node
-      - OPENSEARCH_JAVA_OPTS=-Xms300m -Xmx300m
-      - DISABLE_INSTALL_DEMO_CONFIG=true
-      - DISABLE_SECURITY_PLUGIN=true
-      # Workaround on OSX for https://bugs.openjdk.org/browse/JDK-8345296
-      - _JAVA_OPTIONS
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    ports:
-      - "9200"
-    healthcheck:
-      test: curl -s http://localhost:9200/_cluster/health | grep -E '"status":"(green|yellow)"'
-      start_period: 10s
-      interval: 5s
-      timeout: 10s
-      retries: 10
+          memory: 300M
     logging: *logging

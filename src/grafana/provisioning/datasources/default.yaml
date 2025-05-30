@@ -19,3 +19,59 @@ datasources:
         - url: http://localhost:8080/jaeger/ui/trace/$${__value.raw}
           name: trace_id
           urlDisplayLabel: View in Jaeger UI
+  - name: Loki
+    uid: loki
+    type: loki
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: trace_id
+          matcherType: label
+          name: Tempo
+          url: $${__value.raw}
+  # - name: Tempo
+  #   uid: tempo
+  #   type: tempo
+  #   url: http://tempo:3200
+  #   editable: true
+  #   jsonData:
+  #     nodeGraph:
+  #       enabled: true
+  #     serviceMap:
+  #       datasourceUid: 'webstore-metrics'
+  #     tracesToLogsV2:
+  #       datasourceUid: 'loki'
+  #       tags: [
+  #         {
+  #           "key": "service.name",
+  #           "value": "service_name"
+  #         }
+  #       ]
+  #       customQuery: true
+  #       query: >-
+  #         {$${__tags}}| trace_id="$${__trace.traceId}"
+  #       filterByTraceID: false
+  #       spanEndTimeShift: 5m
+  #       spanStartTimeShift: '-5m'
+  #     tracesToMetrics:
+  #       datasourceUid: webstore-metrics
+  #       queries:
+  #         - name: 每分鐘錯誤數
+  #           query: >-
+  #             sum(rate(traces_spanmetrics_latency_count{$$__tags , status_code="STATUS_CODE_ERROR"}[1m])*60)
+  #             by(service, span_name)
+  #         - name: PR95持續時間
+  #           query: >-
+  #             histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[1m])) by (le, service, http_target, http_method))
+  #         - name: 該服務的QPS
+  #           query: >-
+  #             sum(rate(traces_spanmetrics_calls_total{ $$__tags }[1m])*60 ) by (service, http_target)
+  #       spanEndTimeShift: 10m
+  #       spanStartTimeShift: '-10m'
+  #       tags:
+  #         - key: service.name
+  #           value: service
+  #         - key: http.target
+  #           value: http_target

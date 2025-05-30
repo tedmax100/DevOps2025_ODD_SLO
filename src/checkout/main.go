@@ -14,38 +14,40 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/IBM/sarama"
 	"github.com/google/uuid"
 	otelhooks "github.com/open-feature/go-sdk-contrib/hooks/open-telemetry/pkg"
 	flagd "github.com/open-feature/go-sdk-contrib/providers/flagd/pkg"
 	"github.com/open-feature/go-sdk/openfeature"
+	pb "github.com/open-telemetry/opentelemetry-demo/src/checkout/genproto/oteldemo"
+	"github.com/open-telemetry/opentelemetry-demo/src/checkout/kafka"
+	"github.com/open-telemetry/opentelemetry-demo/src/checkout/money"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/bridges/otellogrus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	otelcodes "go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	sdkresource "go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-
-	pb "github.com/open-telemetry/opentelemetry-demo/src/checkout/genproto/oteldemo"
-	"github.com/open-telemetry/opentelemetry-demo/src/checkout/kafka"
-	"github.com/open-telemetry/opentelemetry-demo/src/checkout/money"
 )
 
 //go:generate go install google.golang.org/protobuf/cmd/protoc-gen-go
@@ -58,17 +60,18 @@ var resource *sdkresource.Resource
 var initResourcesOnce sync.Once
 
 func init() {
-	log = logrus.New()
-	log.Level = logrus.DebugLevel
-	log.Formatter = &logrus.JSONFormatter{
-		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyTime:  "timestamp",
-			logrus.FieldKeyLevel: "severity",
-			logrus.FieldKeyMsg:   "message",
-		},
-		TimestampFormat: time.RFC3339Nano,
-	}
-	log.Out = os.Stdout
+	// log = logrus.New()
+	// log.Level = logrus.DebugLevel
+	// log.Formatter = &logrus.JSONFormatter{
+	// 	FieldMap: logrus.FieldMap{
+	// 		logrus.FieldKeyTime:  "timestamp",
+	// 		logrus.FieldKeyLevel: "severity",
+	// 		logrus.FieldKeyMsg:   "message",
+	// 	},
+	// 	TimestampFormat: time.RFC3339Nano,
+	// }
+	// log.Out = os.Stdout
+	initLogProvider()
 }
 
 func initResource() *sdkresource.Resource {
@@ -118,6 +121,31 @@ func initMeterProvider() *sdkmetric.MeterProvider {
 	)
 	otel.SetMeterProvider(mp)
 	return mp
+}
+
+func initLogProvider() {
+	ctx := context.Background()
+	logExporter, err := otlploggrpc.New(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	lp := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
+		sdklog.WithResource(initResource()),
+	)
+
+	global.SetLoggerProvider(lp)
+
+	log = logrus.New()
+
+	baseHook := otellogrus.NewHook("checkout", otellogrus.WithLoggerProvider(lp))
+
+	customHook := &severityHook{
+		baseHook: baseHook,
+	}
+
+	log.AddHook(customHook)
 }
 
 type checkout struct {
@@ -207,7 +235,8 @@ func main() {
 		}
 	}
 
-	log.Infof("service config: %+v", svc)
+	//log.Infof("service config: %+v", svc)
+	logrus.Infof("service config: %+v", svc)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
@@ -218,10 +247,11 @@ func main() {
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 	pb.RegisterCheckoutServiceServer(srv, svc)
-
-	healthcheck := health.NewServer()
-	healthpb.RegisterHealthServer(srv, healthcheck)
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	//healthpb.RegisterHealthServer(srv, svc)
 	log.Infof("starting to listen on tcp: %q", lis.Addr().String())
+
 	err = srv.Serve(lis)
 	log.Fatal(err)
 }
@@ -248,7 +278,6 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 		attribute.String("app.user.id", req.UserId),
 		attribute.String("app.user.currency", req.UserCurrency),
 	)
-	log.Infof("[PlaceOrder] user_id=%q user_currency=%q", req.UserId, req.UserCurrency)
 
 	var err error
 	defer func() {
@@ -261,6 +290,8 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to generate order uuid")
 	}
+
+	log.WithContext(ctx).Infof("[PlaceOrder] user_id=%q user_currency=%q order_id=%q", req.UserId, req.UserCurrency, orderID.String())
 
 	prep, err := cs.prepareOrderItemsAndShippingQuoteFromCart(ctx, req.UserId, req.UserCurrency, req.Address)
 	if err != nil {
@@ -281,7 +312,8 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to charge card: %+v", err)
 	}
-	log.Infof("payment went through (transaction_id: %s)", txID)
+	log.WithContext(ctx).Infof("payment went through (transaction_id: %s)", txID)
+
 	span.AddEvent("charged",
 		trace.WithAttributes(attribute.String("app.payment.transaction.id", txID)))
 
@@ -314,14 +346,14 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	)
 
 	if err := cs.sendOrderConfirmation(ctx, req.Email, orderResult); err != nil {
-		log.Warnf("failed to send order confirmation to %q: %+v", req.Email, err)
+		log.WithContext(ctx).Warnf("failed to send order confirmation to %q: %+v", req.Email, err)
 	} else {
-		log.Infof("order confirmation email sent to %q", req.Email)
+		log.WithContext(ctx).Infof("order confirmation email sent to %q", req.Email)
 	}
 
 	// send to kafka only if kafka broker address is set
 	if cs.kafkaBrokerSvcAddr != "" {
-		log.Infof("sending to postProcessor")
+		log.WithContext(ctx).Infof("sending to postProcessor")
 		cs.sendToPostProcessor(ctx, orderResult)
 	}
 
@@ -495,7 +527,7 @@ func (cs *checkout) shipOrder(ctx context.Context, address *pb.Address, items []
 func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderResult) {
 	message, err := proto.Marshal(result)
 	if err != nil {
-		log.Errorf("Failed to marshal message to protobuf: %+v", err)
+		log.WithContext(ctx).Errorf("Failed to marshal message to protobuf: %+v", err)
 		return
 	}
 
@@ -512,7 +544,7 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 	startTime := time.Now()
 	select {
 	case cs.KafkaProducerClient.Input() <- &msg:
-		log.Infof("Message sent to Kafka: %v", msg)
+		log.WithContext(ctx).Infof("Message sent to Kafka: %v", msg)
 		select {
 		case successMsg := <-cs.KafkaProducerClient.Successes():
 			span.SetAttributes(
@@ -520,21 +552,21 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 				attribute.KeyValue(semconv.MessagingKafkaMessageOffset(int(successMsg.Offset))),
 			)
-			log.Infof("Successful to write message. offset: %v, duration: %v", successMsg.Offset, time.Since(startTime))
+			log.WithContext(ctx).Infof("Successful to write message. offset: %v, duration: %v", successMsg.Offset, time.Since(startTime))
 		case errMsg := <-cs.KafkaProducerClient.Errors():
 			span.SetAttributes(
 				attribute.Bool("messaging.kafka.producer.success", false),
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 			)
 			span.SetStatus(otelcodes.Error, errMsg.Err.Error())
-			log.Errorf("Failed to write message: %v", errMsg.Err)
+			log.WithContext(ctx).Errorf("Failed to write message: %v", errMsg.Err)
 		case <-ctx.Done():
 			span.SetAttributes(
 				attribute.Bool("messaging.kafka.producer.success", false),
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 			)
 			span.SetStatus(otelcodes.Error, "Context cancelled: "+ctx.Err().Error())
-			log.Warnf("Context canceled before success message received: %v", ctx.Err())
+			log.WithContext(ctx).Warnf("Context canceled before success message received: %v", ctx.Err())
 		}
 	case <-ctx.Done():
 		span.SetAttributes(
@@ -542,20 +574,20 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 			attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 		)
 		span.SetStatus(otelcodes.Error, "Failed to send: "+ctx.Err().Error())
-		log.Errorf("Failed to send message to Kafka within context deadline: %v", ctx.Err())
+		log.WithContext(ctx).Errorf("Failed to send message to Kafka within context deadline: %v", ctx.Err())
 		return
 	}
 
 	ffValue := cs.getIntFeatureFlag(ctx, "kafkaQueueProblems")
 	if ffValue > 0 {
-		log.Infof("Warning: FeatureFlag 'kafkaQueueProblems' is activated, overloading queue now.")
+		log.WithContext(ctx).Infof("Warning: FeatureFlag 'kafkaQueueProblems' is activated, overloading queue now.")
 		for i := 0; i < ffValue; i++ {
 			go func(i int) {
 				cs.KafkaProducerClient.Input() <- &msg
 				_ = <-cs.KafkaProducerClient.Successes()
 			}(i)
 		}
-		log.Infof("Done with #%d messages for overload simulation.", ffValue)
+		log.WithContext(ctx).Infof("Done with #%d messages for overload simulation.", ffValue)
 	}
 }
 
@@ -611,4 +643,48 @@ func (cs *checkout) getIntFeatureFlag(ctx context.Context, featureFlagName strin
 	)
 
 	return int(featureFlagValue)
+}
+
+// 自定义钩子结构体
+type severityHook struct {
+	baseHook *otellogrus.Hook
+}
+
+// 实现 Levels 方法
+func (h *severityHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+// 实现 Fire 方法
+func (h *severityHook) Fire(entry *logrus.Entry) error {
+	// 添加 severity_text 字段
+	if entry.Data == nil {
+		entry.Data = make(logrus.Fields)
+	}
+	entry.Data["severity_text"] = getSeverityText(entry.Level)
+
+	// 调用基础钩子的 Fire 方法
+	return h.baseHook.Fire(entry)
+}
+
+// 将 logrus 级别转换为文本表示
+func getSeverityText(level logrus.Level) string {
+	switch level {
+	case logrus.TraceLevel:
+		return "TRACE"
+	case logrus.DebugLevel:
+		return "DEBUG"
+	case logrus.InfoLevel:
+		return "INFO"
+	case logrus.WarnLevel:
+		return "WARN"
+	case logrus.ErrorLevel:
+		return "ERROR"
+	case logrus.FatalLevel:
+		return "FATAL"
+	case logrus.PanicLevel:
+		return "FATAL"
+	default:
+		return "UNSPECIFIED"
+	}
 }
