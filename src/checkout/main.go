@@ -125,7 +125,16 @@ func initMeterProvider() *sdkmetric.MeterProvider {
 
 func initLogProvider() {
 	ctx := context.Background()
-	logExporter, err := otlploggrpc.New(ctx)
+
+	otlpEndpoint := os.Getenv("OTEL_COLLECTOR_HOST")
+	if otlpEndpoint == "" {
+		otlpEndpoint = "localhost:4317" // 默認值
+	}
+
+	logExporter, err := otlploggrpc.New(ctx,
+		otlploggrpc.WithEndpoint(otlpEndpoint),
+		otlploggrpc.WithInsecure(),
+	)
 	if err != nil {
 		panic(err)
 	}
