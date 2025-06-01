@@ -137,6 +137,7 @@ func initLogProvider() {
 		otlploggrpc.WithInsecure(),
 	)
 	if err != nil {
+		fmt.Println(err)
 		panic(err)
 	}
 
