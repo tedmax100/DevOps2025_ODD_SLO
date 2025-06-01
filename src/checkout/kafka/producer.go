@@ -3,8 +3,11 @@
 package kafka
 
 import (
+	"context"
+	"log/slog"
+
 	"github.com/IBM/sarama"
-	"github.com/sirupsen/logrus"
+	//"github.com/sirupsen/logrus"
 )
 
 var (
@@ -12,9 +15,10 @@ var (
 	ProtocolVersion = sarama.V3_0_0_0
 )
 
-func CreateKafkaProducer(brokers []string, log *logrus.Logger) (sarama.AsyncProducer, error) {
-	sarama.Logger = log
-
+// func CreateKafkaProducer(brokers []string, log *logrus.Logger) (sarama.AsyncProducer, error) {
+func CreateKafkaProducer(brokers []string, logger *slog.Logger) (sarama.AsyncProducer, error) {
+	//sarama.Logger = log
+	sarama.Logger = saramaLogAdapter{logger: logger}
 	saramaConfig := sarama.NewConfig()
 	saramaConfig.Producer.Return.Successes = true
 	saramaConfig.Producer.Return.Errors = true
@@ -36,8 +40,26 @@ func CreateKafkaProducer(brokers []string, log *logrus.Logger) (sarama.AsyncProd
 	// We will log to STDOUT if we're not able to produce messages.
 	go func() {
 		for err := range producer.Errors() {
-			log.Errorf("Failed to write message: %+v", err)
+			slog.ErrorContext(context.Background(), "Failed to write message: %+v", err)
+			//log.Errorf("Failed to write message: %+v", err)
 		}
 	}()
 	return producer, nil
+}
+
+// 自定義 sarama 日誌適配器
+type saramaLogAdapter struct {
+	logger *slog.Logger
+}
+
+func (a saramaLogAdapter) Print(v ...interface{}) {
+	a.logger.Info("sarama", "msg", v)
+}
+
+func (a saramaLogAdapter) Printf(format string, v ...interface{}) {
+	a.logger.Info("sarama", "msg", format, "args", v)
+}
+
+func (a saramaLogAdapter) Println(v ...interface{}) {
+	a.logger.Info("sarama", "msg", v)
 }

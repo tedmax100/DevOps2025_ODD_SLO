@@ -7,12 +7,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"log/slog"
 
 	"github.com/IBM/sarama"
 	"github.com/google/uuid"
@@ -24,6 +27,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-demo/src/checkout/money"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/bridges/otellogrus"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
@@ -54,7 +58,7 @@ import (
 //go:generate go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
 //go:generate protoc --go_out=./ --go-grpc_out=./ --proto_path=../../pb ../../pb/demo.proto
 
-var log *logrus.Logger
+// var log *logrus.Logger
 var tracer trace.Tracer
 var resource *sdkresource.Resource
 var initResourcesOnce sync.Once
@@ -96,7 +100,8 @@ func initTracerProvider() *sdktrace.TracerProvider {
 
 	exporter, err := otlptracegrpc.New(ctx)
 	if err != nil {
-		log.Fatalf("new otlp trace grpc exporter failed: %v", err)
+		slog.ErrorContext(ctx, "new otlp trace grpc exporter failed: %v", err)
+		//log.Fatalf("new otlp trace grpc exporter failed: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
@@ -112,7 +117,8 @@ func initMeterProvider() *sdkmetric.MeterProvider {
 
 	exporter, err := otlpmetricgrpc.New(ctx)
 	if err != nil {
-		log.Fatalf("new otlp metric grpc exporter failed: %v", err)
+		slog.ErrorContext(ctx, "new otlp metric grpc exporter failed: %v", err)
+		//log.Fatalf("new otlp metric grpc exporter failed: %v", err)
 	}
 
 	mp := sdkmetric.NewMeterProvider(
@@ -147,16 +153,17 @@ func initLogProvider() {
 	)
 
 	global.SetLoggerProvider(lp)
+	slog.SetDefault(otelslog.NewLogger("checkout"))
+	otelslog.NewLogger("checkout", otelslog.WithLoggerProvider(lp))
+	//log = logrus.New()
 
-	log = logrus.New()
+	//baseHook := otellogrus.NewHook("checkout", otellogrus.WithLoggerProvider(lp))
 
-	baseHook := otellogrus.NewHook("checkout", otellogrus.WithLoggerProvider(lp))
+	//customHook := &severityHook{
+	//	baseHook: baseHook,
+	//}
 
-	customHook := &severityHook{
-		baseHook: baseHook,
-	}
-
-	log.AddHook(customHook)
+	//log.AddHook(customHook)
 }
 
 type checkout struct {
@@ -184,20 +191,23 @@ func main() {
 	tp := initTracerProvider()
 	defer func() {
 		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
+			slog.ErrorContext(context.Background(), "Error shutting down tracer provider: %v", err)
+			//log.Printf("Error shutting down tracer provider: %v", err)
 		}
 	}()
 
 	mp := initMeterProvider()
 	defer func() {
 		if err := mp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down meter provider: %v", err)
+			slog.ErrorContext(context.Background(), "Error shutting down meter provider: %v", err)
+			//log.Printf("Error shutting down meter provider: %v", err)
 		}
 	}()
 
 	err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(time.Second))
 	if err != nil {
-		log.Fatal(err)
+		slog.ErrorContext(context.Background(), "Error runtime.Start: %v", err)
+		//log.Fatal(err)
 	}
 
 	openfeature.SetProvider(flagd.NewProvider())
@@ -240,9 +250,10 @@ func main() {
 	svc.kafkaBrokerSvcAddr = os.Getenv("KAFKA_ADDR")
 
 	if svc.kafkaBrokerSvcAddr != "" {
-		svc.KafkaProducerClient, err = kafka.CreateKafkaProducer([]string{svc.kafkaBrokerSvcAddr}, log)
+		svc.KafkaProducerClient, err = kafka.CreateKafkaProducer([]string{svc.kafkaBrokerSvcAddr}, slog.Default())
 		if err != nil {
-			log.Fatal(err)
+			slog.ErrorContext(context.Background(), "Error CreateKafkaProducer: %v", err)
+			//log.Fatal(err)
 		}
 	}
 
@@ -251,7 +262,8 @@ func main() {
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
-		log.Fatal(err)
+		slog.ErrorContext(context.Background(), "Error net.Listen: %v", err)
+		//log.Fatal(err)
 	}
 
 	var srv = grpc.NewServer(
@@ -261,7 +273,8 @@ func main() {
 	healthServer := health.NewServer()
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 	//healthpb.RegisterHealthServer(srv, svc)
-	log.Infof("starting to listen on tcp: %q", lis.Addr().String())
+	slog.InfoContext(context.Background(), "starting to listen on tcp: %q", lis.Addr().String())
+	//log.Infof("starting to listen on tcp: %q", lis.Addr().String())
 
 	err = srv.Serve(lis)
 	log.Fatal(err)
@@ -302,7 +315,8 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 		return nil, status.Errorf(codes.Internal, "failed to generate order uuid")
 	}
 
-	log.WithContext(ctx).Infof("[PlaceOrder] user_id=%q user_currency=%q order_id=%q", req.UserId, req.UserCurrency, orderID.String())
+	slog.InfoContext(ctx, "[PlaceOrder] user_id=%q user_currency=%q order_id=%q", req.UserId, req.UserCurrency, orderID.String())
+	//log.WithContext(ctx).Infof("[PlaceOrder] user_id=%q user_currency=%q order_id=%q", req.UserId, req.UserCurrency, orderID.String())
 
 	prep, err := cs.prepareOrderItemsAndShippingQuoteFromCart(ctx, req.UserId, req.UserCurrency, req.Address)
 	if err != nil {
@@ -323,7 +337,8 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to charge card: %+v", err)
 	}
-	log.WithContext(ctx).Infof("payment went through (transaction_id: %s)", txID)
+	slog.InfoContext(ctx, "payment went through (transaction_id: %s)", txID)
+	//log.WithContext(ctx).Infof("payment went through (transaction_id: %s)", txID)
 
 	span.AddEvent("charged",
 		trace.WithAttributes(attribute.String("app.payment.transaction.id", txID)))
@@ -357,14 +372,17 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	)
 
 	if err := cs.sendOrderConfirmation(ctx, req.Email, orderResult); err != nil {
-		log.WithContext(ctx).Warnf("failed to send order confirmation to %q: %+v", req.Email, err)
+		slog.WarnContext(ctx, "failed to send order confirmation to %q: %+v", req.Email, err)
+		//log.WithContext(ctx).Warnf("failed to send order confirmation to %q: %+v", req.Email, err)
 	} else {
-		log.WithContext(ctx).Infof("order confirmation email sent to %q", req.Email)
+		slog.InfoContext(ctx, "order confirmation email sent to %q", req.Email)
+		//log.WithContext(ctx).Infof("order confirmation email sent to %q", req.Email)
 	}
 
 	// send to kafka only if kafka broker address is set
 	if cs.kafkaBrokerSvcAddr != "" {
-		log.WithContext(ctx).Infof("sending to postProcessor")
+		slog.InfoContext(ctx, "sending to postProcessor")
+		//log.WithContext(ctx).Infof("sending to postProcessor")
 		cs.sendToPostProcessor(ctx, orderResult)
 	}
 
@@ -538,7 +556,8 @@ func (cs *checkout) shipOrder(ctx context.Context, address *pb.Address, items []
 func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderResult) {
 	message, err := proto.Marshal(result)
 	if err != nil {
-		log.WithContext(ctx).Errorf("Failed to marshal message to protobuf: %+v", err)
+		slog.ErrorContext(ctx, "Failed to marshal message to protobuf: %+v", err)
+		//log.WithContext(ctx).Errorf("Failed to marshal message to protobuf: %+v", err)
 		return
 	}
 
@@ -555,7 +574,8 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 	startTime := time.Now()
 	select {
 	case cs.KafkaProducerClient.Input() <- &msg:
-		log.WithContext(ctx).Infof("Message sent to Kafka: %v", msg)
+		slog.InfoContext(ctx, "Message sent to Kafka: %v", msg)
+		//log.WithContext(ctx).Infof("Message sent to Kafka: %v", msg)
 		select {
 		case successMsg := <-cs.KafkaProducerClient.Successes():
 			span.SetAttributes(
@@ -563,21 +583,24 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 				attribute.KeyValue(semconv.MessagingKafkaMessageOffset(int(successMsg.Offset))),
 			)
-			log.WithContext(ctx).Infof("Successful to write message. offset: %v, duration: %v", successMsg.Offset, time.Since(startTime))
+			slog.InfoContext(ctx, "Successful to write message. offset: %v, duration: %v", successMsg.Offset, time.Since(startTime))
+			//log.WithContext(ctx).Infof("Successful to write message. offset: %v, duration: %v", successMsg.Offset, time.Since(startTime))
 		case errMsg := <-cs.KafkaProducerClient.Errors():
 			span.SetAttributes(
 				attribute.Bool("messaging.kafka.producer.success", false),
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 			)
 			span.SetStatus(otelcodes.Error, errMsg.Err.Error())
-			log.WithContext(ctx).Errorf("Failed to write message: %v", errMsg.Err)
+			slog.ErrorContext(ctx, "Failed to write message: %v", errMsg.Err)
+			//log.WithContext(ctx).Errorf("Failed to write message: %v", errMsg.Err)
 		case <-ctx.Done():
 			span.SetAttributes(
 				attribute.Bool("messaging.kafka.producer.success", false),
 				attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 			)
 			span.SetStatus(otelcodes.Error, "Context cancelled: "+ctx.Err().Error())
-			log.WithContext(ctx).Warnf("Context canceled before success message received: %v", ctx.Err())
+			slog.WarnContext(ctx, "Context canceled before success message received: %v", ctx.Err())
+			//log.WithContext(ctx).Warnf("Context canceled before success message received: %v", ctx.Err())
 		}
 	case <-ctx.Done():
 		span.SetAttributes(
@@ -585,20 +608,23 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 			attribute.Int("messaging.kafka.producer.duration_ms", int(time.Since(startTime).Milliseconds())),
 		)
 		span.SetStatus(otelcodes.Error, "Failed to send: "+ctx.Err().Error())
-		log.WithContext(ctx).Errorf("Failed to send message to Kafka within context deadline: %v", ctx.Err())
+		slog.ErrorContext(ctx, "Failed to send message to Kafka within context deadline: %v", ctx.Err())
+		//log.WithContext(ctx).Errorf("Failed to send message to Kafka within context deadline: %v", ctx.Err())
 		return
 	}
 
 	ffValue := cs.getIntFeatureFlag(ctx, "kafkaQueueProblems")
 	if ffValue > 0 {
-		log.WithContext(ctx).Infof("Warning: FeatureFlag 'kafkaQueueProblems' is activated, overloading queue now.")
+		slog.InfoContext(ctx, "Warning: FeatureFlag 'kafkaQueueProblems' is activated, overloading queue now.")
+		//log.WithContext(ctx).Infof("Warning: FeatureFlag 'kafkaQueueProblems' is activated, overloading queue now.")
 		for i := 0; i < ffValue; i++ {
 			go func(i int) {
 				cs.KafkaProducerClient.Input() <- &msg
 				_ = <-cs.KafkaProducerClient.Successes()
 			}(i)
 		}
-		log.WithContext(ctx).Infof("Done with #%d messages for overload simulation.", ffValue)
+		slog.InfoContext(ctx, "Done with #%d messages for overload simulation.", ffValue)
+		//log.WithContext(ctx).Infof("Done with #%d messages for overload simulation.", ffValue)
 	}
 }
 
