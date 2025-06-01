@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -42,7 +42,7 @@
         "content": "This dashboard shows the use of metric exemplars.\nExemplars can be used to look up a trace in Jaeger.\nOnly the most recent exemplars may still be available in Jaeger.\n<br>\nChart panels may require 5 minutes after the Demo is started before rendering data.",
         "mode": "html"
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.1",
       "title": "",
       "type": "text"
     },
@@ -58,6 +58,138 @@
       "panels": [],
       "title": "GetCart Exemplars",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "webstore-metrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "yellow",
+                "value": 400000
+              },
+              {
+                "color": "dark-red",
+                "value": 500000
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 3
+      },
+      "id": 9,
+      "interval": "2m",
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(rate(app_cart_get_cart_latency_bucket{le=\"500000\"}[5m])) / sum(rate(app_cart_get_cart_latency_count[5m])) * 100",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Duration SLO 達成率",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "webstore-metrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 3
+      },
+      "id": 10,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "100* (1 - (sum(rate(traces_span_metrics_calls_total{status_code=\"STATUS_CODE_ERROR\", service_name=\"checkout\"}[$__rate_interval])) / sum(rate(traces_span_metrics_calls_total{service_name=\"checkout\"}[$__rate_interval]))) )",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Checkout 成功率",
+      "type": "gauge"
     },
     {
       "datasource": {
@@ -80,10 +212,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 10,
         "w": 24,
         "x": 0,
-        "y": 3
+        "y": 11
       },
       "id": 2,
       "interval": "2m",
@@ -121,11 +253,11 @@
           "reverse": false
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": true,
           "expr": "sum by(le) (rate(app_cart_get_cart_latency_bucket[$__rate_interval]))",
           "format": "heatmap",
@@ -136,6 +268,19 @@
           "range": true,
           "refId": "A",
           "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "webstore-metrics"
+          },
+          "editorMode": "code",
+          "expr": "",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "GetCart Latency Heatmap with Exemplars",
@@ -189,15 +334,15 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "ms"
         },
         "overrides": []
       },
@@ -205,7 +350,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 21
       },
       "id": 5,
       "interval": "2m",
@@ -217,11 +362,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "datasource": {
@@ -229,7 +375,7 @@
             "uid": "webstore-metrics"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": true,
           "expr": "histogram_quantile(0.95, sum by(le) (rate(app_cart_get_cart_latency_bucket[$__rate_interval])))",
           "fullMetaSearch": false,
@@ -249,7 +395,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 31
       },
       "id": 3,
       "panels": [],
@@ -280,7 +426,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 32
       },
       "id": 6,
       "interval": "2m",
@@ -318,7 +464,7 @@
           "reverse": false
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "disableTextWrap": false,
@@ -401,7 +547,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 41
       },
       "id": 1,
       "interval": "2m",
@@ -413,11 +559,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.1",
       "targets": [
         {
           "datasource": {
@@ -441,7 +588,7 @@
     }
   ],
   "preload": false,
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": []
@@ -454,6 +601,5 @@
   "timezone": "browser",
   "title": "Cart Service Exemplars",
   "uid": "ce6sd46kfkglca",
-  "version": 3,
-  "weekStart": ""
+  "version": 1
 }
