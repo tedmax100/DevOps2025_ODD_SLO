@@ -130,6 +130,7 @@ func initLogProvider() {
 	if otlpEndpoint == "" {
 		otlpEndpoint = "localhost:4317" // 默認值
 	}
+	fmt.Println("otlpEndpoint", otlpEndpoint)
 
 	logExporter, err := otlploggrpc.New(ctx,
 		otlploggrpc.WithEndpoint(otlpEndpoint),
