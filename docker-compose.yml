@@ -13,6 +13,9 @@ networks:
     name: opentelemetry-demo
     driver: bridge
 
+volumes:
+  gradle-cache:
+
 services:
   # ******************
   # Core Demo Services
@@ -238,6 +241,8 @@ services:
         limits:
           memory: 300M
     restart: unless-stopped
+    volumes:
+      - gradle-cache:/home/gradle/.gradle 
     environment:
       - FLAGD_HOST
       - FLAGD_PORT

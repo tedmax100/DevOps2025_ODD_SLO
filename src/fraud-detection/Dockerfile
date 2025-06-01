@@ -7,8 +7,9 @@ WORKDIR /usr/src/app/
 
 COPY ./src/fraud-detection/ ./
 COPY ./pb/ ./src/main/proto/
+COPY ./src/fraud-detection/build.gradle ./src/fraud-detection/settings.gradle ./
 
-RUN gradle shadowJar
+RUN gradle shadowJar --no-daemon
 
 # 在 builder 階段下載 agent
 RUN curl -L -o opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVA_AGENT_VERSION}/opentelemetry-javaagent.jar
