@@ -3,18 +3,20 @@
 
 FROM --platform=${BUILDPLATFORM} gradle:8-jdk17 AS builder
 
-# 在 FROM 後面立即定義 ARG，這樣可以在這個構建階段使用
 ARG OTEL_JAVA_AGENT_VERSION
 
 WORKDIR /usr/src/app/
 
+# 修改 COPY 指令，分開複製 build.gradle 和其他文件
 COPY ./src/fraud-detection/ ./
 COPY ./pb/ ./src/main/proto/
-COPY ./src/fraud-detection/build.gradle ./src/fraud-detection/settings.gradle ./
+COPY ./src/fraud-detection/build.gradle ./
+
+# 如果 settings.gradle 不存在，我們可以創建一個基本的
+RUN echo "rootProject.name = 'fraud-detection'" > settings.gradle
 
 RUN gradle shadowJar --no-daemon
 
-# 使用傳入的 OTEL_JAVA_AGENT_VERSION
 RUN curl -L -o opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVA_AGENT_VERSION}/opentelemetry-javaagent.jar
 
 FROM gcr.io/distroless/java17-debian12:nonroot
