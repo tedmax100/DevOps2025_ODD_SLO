@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 3,
   "links": [],
   "panels": [
     {
@@ -91,12 +91,97 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
+        "w": 8,
         "x": 0,
         "y": 3
       },
       "id": 9,
       "interval": "2m",
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Checkout服務",
+          "url": "http://localhost:8080/grafana/d/W2gX2zHVk/demo-dashboard?orgId=1&from=now-15m&to=now&timezone=browser&var-service=checkout"
+        },
+        {
+          "targetBlank": true,
+          "title": "Payment服務",
+          "url": "http://localhost:8080/grafana/d/W2gX2zHVk/demo-dashboard?orgId=1&from=now-15m&to=now&timezone=browser&var-service=payment"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 1
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(rate(app_cart_get_cart_latency_bucket{le=\"500000\"}[5m])) / sum(rate(app_cart_get_cart_latency_count[5m])) * 100",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "購物車請求<500ms的比例",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "webstore-metrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "dark-red",
+                "value": 1000
+              }
+            ]
+          },
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 3
+      },
+      "id": 11,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -118,15 +203,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "exemplar": false,
-          "expr": "sum(rate(app_cart_get_cart_latency_bucket{le=\"500000\"}[5m])) / sum(rate(app_cart_get_cart_latency_count[5m])) * 100",
-          "instant": false,
+          "expr": "histogram_quantile(0.99, rate(app_cart_get_cart_latency_bucket[5m]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Duration SLO 達成率",
+      "title": "購物車請求延遲 (P99)",
       "type": "stat"
     },
     {
@@ -144,11 +227,15 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "red"
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "yellow",
+                "value": 90
+              },
+              {
+                "color": "green",
+                "value": 99
               }
             ]
           },
@@ -158,8 +245,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 6,
+        "w": 8,
+        "x": 16,
         "y": 3
       },
       "id": 10,
@@ -182,13 +269,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "100* (1 - (sum(rate(traces_span_metrics_calls_total{status_code=\"STATUS_CODE_ERROR\", service_name=\"checkout\"}[$__rate_interval])) / sum(rate(traces_span_metrics_calls_total{service_name=\"checkout\"}[$__rate_interval]))) )",
+          "expr": "100* (1 - (sum(rate(traces_span_metrics_calls_total{status_code=\"STATUS_CODE_ERROR\", service_name=\"cart\"}[$__rate_interval])) / sum(rate(traces_span_metrics_calls_total{service_name=\"cart\"}[$__rate_interval]))) ) or vector(100)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Checkout 成功率",
+      "title": "購物車請求成功率",
       "type": "gauge"
     },
     {
