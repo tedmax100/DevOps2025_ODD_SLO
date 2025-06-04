@@ -34,7 +34,20 @@ public class CartService : Oteldemo.CartService.CartServiceBase
 
         try
         {
-            await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, request.Item.Quantity);
+            double failureRate = await _featureFlagHelper.GetDoubleValueAsync("cartFailure", 0.0);
+            double randomValue = 9 + (random.NextDouble() * 91);
+            double scaledFailureRate = 9 + (failureRate * 91);
+
+            if (randomValue < scaledFailureRate)
+            {
+                await Task.Delay(random.Next(500, 2500));
+                
+                    Console.WriteLine($"AddItem - 呼叫_badCartStore 出错");
+                    activity?.SetStatus(ActivityStatusCode.Error, "呼叫_badCartStore 出错");
+                    throw new RpcException(new Status(StatusCode.Internal, "呼叫_badCartStore 出错"));
+            } else {
+                await _cartStore.AddItemAsync(request.UserId, request.Item.ProductId, request.Item.Quantity);
+            }
 
             return Empty;
         }
@@ -54,6 +67,14 @@ public class CartService : Oteldemo.CartService.CartServiceBase
 
         try
         {
+            double failureRate = await _featureFlagHelper.GetDoubleValueAsync("cartFailure", 0.0);
+            double randomValue = 9 + (random.NextDouble() * 91);
+            double scaledFailureRate = 9 + (failureRate * 91);
+
+            if (randomValue < scaledFailureRate)
+            {
+                 await Task.Delay(random.Next(100, 500));
+            }
             var cart = await _cartStore.GetCartAsync(request.UserId);
             var totalCart = 0;
             foreach (var item in cart.Items)
@@ -63,6 +84,7 @@ public class CartService : Oteldemo.CartService.CartServiceBase
             activity?.SetTag("app.cart.items.count", totalCart);
 
             return cart;
+            
         }
         catch (RpcException ex)
         {
@@ -80,9 +102,23 @@ public class CartService : Oteldemo.CartService.CartServiceBase
 
         try
         {
-            if (await _featureFlagHelper.GetBooleanValueAsync("cartFailure", false))
+            double failureRate = await _featureFlagHelper.GetDoubleValueAsync("cartFailure", 0.0);
+            double randomValue = 9 + (random.NextDouble() * 91);
+            double scaledFailureRate = 9 + (failureRate * 91);
+
+            if (randomValue < scaledFailureRate)
             {
-                await _badCartStore.EmptyCartAsync(request.UserId);
+                if (randomValue <= 20)
+                {
+                    await Task.Delay(random.Next(1000, 3001));
+                    await _badCartStore.EmptyCartAsync(request.UserId);
+                }
+                else
+                {
+                    Console.WriteLine($"EmptyCart - 呼叫_badCartStore 出错");
+                    activity?.SetStatus(ActivityStatusCode.Error, "呼叫_badCartStore 出错");
+                    throw new RpcException(new Status(StatusCode.Internal, "呼叫_badCartStore 出错"));
+                }
             }
             else
             {

@@ -8,7 +8,7 @@
         "on": true,
         "off": false
       },
-      "defaultVariant": "on"
+      "defaultVariant": "off"
     },
     "recommendationCacheFailure": {
       "description": "Fail recommendation service cache",
@@ -44,7 +44,7 @@
         "on": true,
         "off": false
       },
-      "defaultVariant": "on"
+      "defaultVariant": "off"
     },
     "kafkaQueueProblems": {
       "description": "Overloads Kafka queue while simultaneously introducing a consumer side delay leading to a lag spike",
@@ -59,10 +59,15 @@
       "description": "Fail cart service",
       "state": "ENABLED",
       "variants": {
-        "on": true,
-        "off": false
+        "100%": 1,
+        "90%": 0.95,
+        "75%": 0.75,
+        "50%": 0.5,
+        "25%": 0.25,
+        "10%": 0.1,
+        "off": 0
       },
-      "defaultVariant": "on"
+      "defaultVariant": "75%"
     },
     "paymentFailure": {
       "description": "Fail payment service charge requests n%",
@@ -76,7 +81,7 @@
         "10%": 0.1,
         "off": 0
       },
-      "defaultVariant": "90%"
+      "defaultVariant": "10%"
     },
     "paymentUnreachable": {
       "description": "Payment service is unavailable",
