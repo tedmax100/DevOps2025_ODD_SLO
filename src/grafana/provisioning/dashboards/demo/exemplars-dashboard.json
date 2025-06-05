@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -47,7 +47,7 @@
       "type": "text"
     },
     {
-      "collapsed": false,
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -55,12 +55,212 @@
         "y": 2
       },
       "id": 4,
-      "panels": [],
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "webstore-metrics"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 3
+          },
+          "id": 2,
+          "interval": "2m",
+          "options": {
+            "calculate": false,
+            "cellGap": 1,
+            "color": {
+              "exponent": 0.5,
+              "fill": "dark-orange",
+              "mode": "scheme",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Spectral",
+              "steps": 64
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "tooltip": {
+              "mode": "single",
+              "showColorScale": false,
+              "yHistogram": false
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "reverse": false
+            }
+          },
+          "pluginVersion": "11.6.1",
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "sum by(le) (rate(traces_span_metrics_duration_milliseconds_bucket[$__rate_interval]))",
+              "format": "heatmap",
+              "fullMetaSearch": false,
+              "includeNullMetadata": false,
+              "instant": true,
+              "legendFormat": "{{le}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "GetCart Latency Heatmap with Exemplars",
+          "type": "heatmap"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "webstore-metrics"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 13
+          },
+          "id": 5,
+          "interval": "2m",
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.6.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "webstore-metrics"
+              },
+              "disableTextWrap": false,
+              "editorMode": "code",
+              "exemplar": true,
+              "expr": "histogram_quantile(0.95, sum by(le) (rate(traces_span_metrics_duration_milliseconds_bucket[$__rate_interval])))",
+              "fullMetaSearch": false,
+              "includeNullMetadata": false,
+              "legendFormat": "p95 GetCart",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "95th Pct Cart GetCart Latency with Exemplars",
+          "type": "timeseries"
+        }
+      ],
       "title": "GetCart Exemplars",
       "type": "row"
     },
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 3,
+      "panels": [],
+      "title": "AddItem Exemplars",
+      "type": "row"
+    },
+    {
       "datasource": {
+        "type": "prometheus",
         "uid": "webstore-metrics"
       },
       "fieldConfig": {
@@ -73,42 +273,24 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "dark-red"
               },
               {
-                "color": "yellow",
-                "value": 400000
-              },
-              {
-                "color": "dark-red",
-                "value": 500000
+                "color": "green",
+                "value": 80
               }
             ]
-          },
-          "unit": "percent"
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
+        "h": 7,
+        "w": 4,
         "x": 0,
-        "y": 3
+        "y": 4
       },
-      "id": 9,
-      "interval": "2m",
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Checkout服務",
-          "url": "http://localhost:8080/grafana/d/W2gX2zHVk/demo-dashboard?orgId=1&from=now-15m&to=now&timezone=browser&var-service=checkout"
-        },
-        {
-          "targetBlank": true,
-          "title": "Payment服務",
-          "url": "http://localhost:8080/grafana/d/W2gX2zHVk/demo-dashboard?orgId=1&from=now-15m&to=now&timezone=browser&var-service=payment"
-        }
-      ],
+      "id": 14,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -123,9 +305,6 @@
           "values": false
         },
         "showPercentChange": false,
-        "text": {
-          "titleSize": 1
-        },
         "textMode": "auto",
         "wideLayout": true
       },
@@ -134,25 +313,28 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum(rate(app_cart_add_item_latency_seconds_bucket{le=\"0.5\"}[5m])) / sum(rate(app_cart_add_item_latency_seconds_bucket[5m])) * 100",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
+          "expr": "increase(app_cart_add_item_latency_seconds_count{}[1h])",
+          "instant": true,
+          "legendFormat": "1小時內",
+          "range": false,
+          "refId": "1hour"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "webstore-metrics"
           },
-          "expr": "",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "increase(app_cart_add_item_latency_seconds_count{}[12h])",
           "hide": false,
-          "instant": false,
-          "range": true,
-          "refId": "B"
+          "instant": true,
+          "legendFormat": "12小時內",
+          "range": false,
+          "refId": "12hr"
         }
       ],
-      "title": "購物車請求<500ms的比例",
+      "title": "加入購物車請求量統計",
       "type": "stat"
     },
     {
@@ -174,7 +356,7 @@
               },
               {
                 "color": "yellow",
-                "value": 500
+                "value": 700
               },
               {
                 "color": "dark-red",
@@ -182,15 +364,83 @@
               }
             ]
           },
-          "unit": "µs"
+          "unit": "ms"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 8,
+        "h": 7,
+        "w": 4,
+        "x": 4,
+        "y": 4
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.50, \n  sum(\n    traces_span_metrics_duration_milliseconds_bucket{\n      service_name=\"cart\", \n      span_name=\"POST /oteldemo.CartService/AddItem\"\n    }\n  ) by (le, span_name)\n)",
+          "legendFormat": "AddItem",
+          "range": true,
+          "refId": "Current"
+        }
+      ],
+      "title": "購物車請求延遲 (P50)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "webstore-metrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "dark-red",
+                "value": 3000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
         "x": 8,
-        "y": 3
+        "y": 4
       },
       "id": 11,
       "options": {
@@ -214,175 +464,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"cart\", span_name=\"POST /oteldemo.CartService/AddItem\"}[10m])) by (le, span_name))",
+          "expr": "histogram_quantile(0.99, \n  sum(\n    traces_span_metrics_duration_milliseconds_bucket{\n      service_name=\"cart\", \n      span_name=\"POST /oteldemo.CartService/AddItem\"\n    }\n  ) by (le, span_name)\n)",
           "legendFormat": "AddItem",
           "range": true,
-          "refId": "A"
+          "refId": "Current"
         }
       ],
       "title": "購物車請求延遲 (P99)",
       "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "webstore-metrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red"
-              },
-              {
-                "color": "yellow",
-                "value": 90
-              },
-              {
-                "color": "green",
-                "value": 99
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 3
-      },
-      "id": 10,
-      "options": {
-        "minVizHeight": 75,
-        "minVizWidth": 75,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "sizing": "auto"
-      },
-      "pluginVersion": "11.6.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "100* (1 - (sum(rate(traces_span_metrics_calls_total{status_code=\"STATUS_CODE_ERROR\", service_name=\"cart\"}[$__rate_interval])) / sum(rate(traces_span_metrics_calls_total{service_name=\"cart\"}[$__rate_interval]))) ) or vector(100)",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "購物車請求成功率",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "webstore-metrics"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "scaleDistribution": {
-              "type": "linear"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 11
-      },
-      "id": 2,
-      "interval": "2m",
-      "options": {
-        "calculate": false,
-        "cellGap": 1,
-        "color": {
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "mode": "scheme",
-          "reverse": false,
-          "scale": "exponential",
-          "scheme": "Spectral",
-          "steps": 64
-        },
-        "exemplars": {
-          "color": "rgba(255,0,255,0.7)"
-        },
-        "filterValues": {
-          "le": 1e-9
-        },
-        "legend": {
-          "show": true
-        },
-        "rowsFrame": {
-          "layout": "auto"
-        },
-        "tooltip": {
-          "mode": "single",
-          "showColorScale": false,
-          "yHistogram": false
-        },
-        "yAxis": {
-          "axisPlacement": "left",
-          "reverse": false
-        }
-      },
-      "pluginVersion": "11.6.1",
-      "targets": [
-        {
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "exemplar": true,
-          "expr": "sum by(le) (rate(app_cart_get_cart_latency_bucket[$__rate_interval]))",
-          "format": "heatmap",
-          "fullMetaSearch": false,
-          "includeNullMetadata": false,
-          "instant": true,
-          "legendFormat": "{{le}}",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "webstore-metrics"
-          },
-          "editorMode": "code",
-          "expr": "",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "GetCart Latency Heatmap with Exemplars",
-      "type": "heatmap"
     },
     {
       "datasource": {
@@ -435,8 +524,12 @@
                 "color": "green"
               },
               {
-                "color": "red",
-                "value": 80
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "dark-red",
+                "value": 3000
               }
             ]
           },
@@ -445,13 +538,12 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 21
+        "h": 7,
+        "w": 8,
+        "x": 12,
+        "y": 4
       },
-      "id": 5,
-      "interval": "2m",
+      "id": 12,
       "options": {
         "legend": {
           "calcs": [],
@@ -468,37 +560,94 @@
       "pluginVersion": "11.6.1",
       "targets": [
         {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.50, \n  sum(\n    traces_span_metrics_duration_milliseconds_bucket{\n      service_name=\"cart\", \n      span_name=\"POST /oteldemo.CartService/AddItem\"\n    }\n  ) by (le, span_name)\n)",
+          "legendFormat": "AddItem",
+          "range": true,
+          "refId": "Current"
+        },
+        {
           "datasource": {
             "type": "prometheus",
             "uid": "webstore-metrics"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "exemplar": true,
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(app_cart_get_cart_latency_bucket[$__rate_interval])))",
-          "fullMetaSearch": false,
-          "includeNullMetadata": false,
-          "legendFormat": "p95 GetCart",
+          "expr": "histogram_quantile(0.99, \n  sum(\n    traces_span_metrics_duration_milliseconds_bucket{\n      service_name=\"cart\", \n      span_name=\"POST /oteldemo.CartService/AddItem\"\n    } offset 1h\n  ) by (le, span_name)\n)",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "AddItem 1h before",
           "range": true,
-          "refId": "A",
-          "useBackend": false
+          "refId": "1hour Befire"
         }
       ],
-      "title": "95th Pct Cart GetCart Latency with Exemplars",
+      "title": "購物車請求延遲 (P50) 的對比",
       "type": "timeseries"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 31
+      "datasource": {
+        "type": "prometheus",
+        "uid": "webstore-metrics"
       },
-      "id": 3,
-      "panels": [],
-      "title": "AddItem Exemplars",
-      "type": "row"
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              },
+              {
+                "color": "yellow",
+                "value": 90
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 20,
+        "y": 4
+      },
+      "id": 10,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "100* (1 - (sum(rate(traces_span_metrics_calls_total{status_code=\"STATUS_CODE_ERROR\", service_name=\"cart\"}[$__rate_interval])) / sum(rate(traces_span_metrics_calls_total{service_name=\"cart\"}[$__rate_interval]))) ) or vector(100)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "購物車請求成功率",
+      "type": "gauge"
     },
     {
       "datasource": {
@@ -524,7 +673,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 11
       },
       "id": 6,
       "interval": "2m",
@@ -566,9 +715,9 @@
       "targets": [
         {
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by(le) (rate(app_cart_add_item_latency_bucket[$__rate_interval]))",
+          "expr": "sum by(le) (rate(app_cart_add_item_latency_seconds_bucket[$__rate_interval]))",
           "format": "heatmap",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
@@ -645,7 +794,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 20
       },
       "id": 1,
       "interval": "2m",
@@ -670,9 +819,9 @@
             "uid": "webstore-metrics"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "histogram_quantile(0.95, sum by(le) (rate(app_cart_add_item_latency_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(app_cart_add_item_latency_seconds_bucket[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "legendFormat": "p95 AddItem",

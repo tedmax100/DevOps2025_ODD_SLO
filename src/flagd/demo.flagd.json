@@ -67,7 +67,7 @@
         "10%": 0.1,
         "off": 0
       },
-      "defaultVariant": "75%"
+      "defaultVariant": "25%"
     },
     "paymentFailure": {
       "description": "Fail payment service charge requests n%",
